@@ -128,7 +128,7 @@ function renderLock(){
       <h3 style="text-align:center;color:#d32f2f">🔒 屏幕已锁定</h3>
       <p style="text-align:center;font-size:12px;color:#888">游戏时间已超限 | 关机重启无法解除</p>
       <div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>
-      <p style="text-align:center;font-size:12px;color:#888">数学 ${c.mathIndex+1}/${STATE.settings.mathCount} | ✅${c.mathCorrect}</p>
+      <p style="text-align:center;font-size:12px;color:#888">数学 ${c.mathIndex+1}/${STATE.settings.mathCount} | ✅${c.mathCorrect} | 难度: ${({easy:'⭐',medium:'⭐⭐',hard:'⭐⭐⭐'})[STATE.settings.mathDifficulty]}</p>
       <div class="challenge-card"><div class="question">${p.q}</div>
         <input id="mathAns" type="number" placeholder="输入答案" autofocus onkeydown="if(event.key==='Enter')submitMath()">
         <button class="btn btn-blue" onclick="submitMath()">提交答案</button>
@@ -156,9 +156,30 @@ function renderLock(){
 
 function genChallenge(){
   const mp=[],diff=STATE.settings.mathDifficulty;
-  for(let i=0;i<STATE.settings.mathCount;i++){let a,b,q,ans;if(diff==='easy'){a=rand(1,50);b=rand(1,50);ans=a+b;q=`${a}+${b}`}else if(diff==='medium'){a=rand(2,12);b=rand(2,12);ans=a*b;q=`${a}×${b}`}else{a=rand(1,20);b=rand(1,20);const c=rand(1,10);ans=a*b+c;q=`${a}×${b}+${c}`}mp.push({q:q+'=?',a:ans})}
-  const pool={easy:[{t:'hello',h:'你好'},{t:'thank you',h:'谢谢'},{t:'good morning',h:'早上好'},{t:'I am happy',h:'我很快乐'},{t:'good night',h:'晚安'}],medium:[{t:'The weather is beautiful today',h:'今天天气很好'},{t:'I enjoy playing with friends',h:'我喜欢和朋友玩'},{t:'Reading books is fun',h:'读书很有趣'},{t:'Practice makes perfect',h:'熟能生巧'}],hard:[{t:'Technology has changed how people communicate',h:'科技改变了交流方式'},{t:'Environmental protection is important',h:'环保很重要'}]};
-  const ep=pool[STATE.settings.englishDifficulty]||pool.medium;return{phase:'math',mathProblems:mp,mathIndex:0,mathCorrect:0,englishPhrases:ep.sort(()=>Math.random()-.5).slice(0,STATE.settings.englishCount),englishIndex:0,englishPass:0};
+  const dl={easy:'简单',medium:'中等',hard:'困难'};
+  for(let i=0;i<STATE.settings.mathCount;i++){
+    let a,b,c,q,ans;
+    if(diff==='easy'){
+      a=rand(1,20);b=rand(1,20);
+      if(Math.random()>0.5){ans=a+b;q=`${a} + ${b}`}else{const mx=Math.max(a,b),mn=Math.min(a,b);a=mx;b=mn;ans=a-b;q=`${a} - ${b}`}
+    }else if(diff==='medium'){
+      a=rand(3,15);b=rand(3,12);c=rand(1,20);
+      if(Math.random()>0.5){ans=a*b;q=`${a} × ${b}`}else{ans=a*b+c;q=`${a} × ${b} + ${c}`}
+    }else{
+      a=rand(5,30);b=rand(3,15);c=rand(10,50);
+      if(Math.random()>0.6){ans=a*b+c;q=`${a} × ${b} + ${c}`}
+      else if(Math.random()>0.5){ans=(a+b)*c;q=`(${a} + ${b}) × ${c}`}
+      else{a=rand(1,10);b=rand(2,20);const x=rand(1,20);ans=a*x+b;q=`${a}x + ${b} = ${ans}，求 x`}
+    }
+    mp.push({q:`${q} = ?`,a:ans,diff:diff});
+  }
+  const pool={
+    easy:[{t:'hello',h:'你好'},{t:'thank you',h:'谢谢'},{t:'good morning',h:'早上好'},{t:'how are you',h:'你好吗'},{t:'I am happy',h:'我很快乐'},{t:'good night',h:'晚安'},{t:'see you later',h:'待会见'}],
+    medium:[{t:'The weather is beautiful today',h:'今天天气很好'},{t:'I enjoy playing with friends',h:'我喜欢和朋友玩'},{t:'Reading books is fun and useful',h:'读书有趣又有用'},{t:'Practice makes perfect',h:'熟能生巧'},{t:'Learning English is important',h:'学英语很重要'},{t:'Music makes me feel happy',h:'音乐让我快乐'}],
+    hard:[{t:'Technology has changed how people communicate in modern society',h:'科技改变了现代社会的交流方式'},{t:'Environmental protection requires everyone to take responsibility',h:'环保需要人人负责'},{t:'Education is the most powerful weapon to change the world',h:'教育是改变世界最强大的武器'},{t:'The journey of a thousand miles begins with a single step',h:'千里之行始于足下'},{t:'Success is not final failure is not fatal',h:'成功不是终点失败不是末日'}]
+  };
+  const ep=pool[STATE.settings.englishDifficulty]||pool.medium;
+  return{phase:'math',mathProblems:mp,mathIndex:0,mathCorrect:0,englishPhrases:ep.sort(()=>Math.random()-.5).slice(0,STATE.settings.englishCount),englishIndex:0,englishPass:0};
 }
 
 function submitMath(){
