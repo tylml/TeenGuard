@@ -26,14 +26,9 @@ android {
     }
 }
 
-configurations.all {
-    resolutionStrategy {
-        force 'org.jetbrains.kotlin:kotlin-stdlib:1.9.0'
-        force 'org.jetbrains.kotlin:kotlin-stdlib-jdk7:1.9.0'
-        force 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.9.0'
-    }
-}
-
 dependencies {
-    implementation 'androidx.appcompat:appcompat:1.6.1'
+    implementation('androidx.appcompat:appcompat:1.6.1') {
+        exclude group: 'org.jetbrains.kotlin'
+        exclude group: 'org.jetbrains.kotlinx'
+    }
 }
