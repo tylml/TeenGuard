@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<title>TeenGuard</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:sans-serif;background:#f5f6fa;color:#333;padding-bottom:70px}
+.header{background:#1a237e;color:#fff;padding:16px 20px;text-align:center}
+.header h1{font-size:22px}.header p{font-size:12px;opacity:.7;margin-top:4px}
+.card{background:#fff;margin:12px 16px;border-radius:14px;padding:18px;box-shadow:0 1px 3px rgba(0,0,0,.08)}
+.timer-circle{width:140px;height:140px;border-radius:50%;border:6px solid #4caf50;display:flex;flex-direction:column;align-items:center;justify-content:center;margin:0 auto 12px}
+.timer-circle.warn{border-color:#ff9800}.timer-circle.danger{border-color:#f44336}
+.timer-value{font-size:26px;font-weight:bold;font-variant-numeric:tabular-nums}
+.timer-label{font-size:11px;color:#888;margin-top:2px}
+.status{text-align:center;font-size:15px;font-weight:600;padding:8px 16px;border-radius:20px;display:inline-block;margin:0 auto}
+.status.safe{background:#e8f5e9;color:#388e3c}.status.warn{background:#fff3e0;color:#e65100}.status.danger{background:#ffebee;color:#c62828}
+.btn{display:block;width:100%;padding:14px;border:none;border-radius:12px;font-size:16px;font-weight:600;text-align:center;cursor:pointer;margin:8px 0}
+.btn-green{background:#4caf50;color:#fff}.btn-orange{background:#ff9800;color:#fff}.btn-red{background:#f44336;color:#fff}.btn-blue{background:#2196f3;color:#fff}.btn-gray{background:#e0e0e0;color:#666}
+.row{display:flex;gap:10px}.row .btn{flex:1}
+.hidden{display:none!important}
+.screen{position:fixed;top:0;left:0;width:100%;height:100%;background:#fff;z-index:100;overflow-y:auto;padding:20px}
+.screen-header{display:flex;align-items:center;gap:12px;margin-bottom:20px}
+.screen-header .back{font-size:22px;cursor:pointer;color:#2196f3}
+.screen-header h2{font-size:20px}
+label{display:block;font-size:13px;color:#888;margin-bottom:4px}
+input[type=number],input[type=password],select{width:100%;padding:12px;border:2px solid #e0e0e0;border-radius:10px;font-size:16px;margin-bottom:12px}
+.pin-dots{display:flex;gap:12px;justify-content:center;margin:16px 0}
+.pin-dot{width:16px;height:16px;border-radius:50%;border:2px solid #ccc}.pin-dot.filled{background:#2196f3;border-color:#2196f3}
+.num-pad{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;max-width:240px;margin:0 auto}
+.num-btn{padding:16px;font-size:22px;border:1px solid #e0e0e0;background:#fff;border-radius:10px;cursor:pointer}
+.progress-bar{height:8px;background:#e0e0e0;border-radius:4px;overflow:hidden;margin-bottom:8px}
+.progress-fill{height:100%;background:#2196f3;border-radius:4px}
+.locked-banner{background:#ffebee;border:1px solid #ffcdd2;padding:16px;border-radius:12px;text-align:center;margin:16px 0}
+.locked-banner .icon{font-size:40px}.locked-banner h3{color:#c62828;margin:8px 0}
+.challenge-card{background:#fff;padding:24px;border-radius:16px;text-align:center;border:2px solid #e3f2fd;margin:16px 0}
+.challenge-card .question{font-size:28px;font-weight:bold;margin:16px 0}
+.challenge-card input{width:100%;padding:14px;border:2px solid #e0e0e0;border-radius:10px;font-size:22px;text-align:center;margin:8px 0}
+.phrase-card{background:#fff;padding:24px;border-radius:16px;text-align:center;border:2px solid #e8f5e9;margin:16px 0}
+.phrase-card .target{font-size:22px;color:#2e7d32;font-weight:bold;margin:12px 0}
+.phrase-card .hint{font-size:14px;color:#999}
+.record-btn{width:80px;height:80px;border-radius:50%;border:3px solid #e0e0e0;background:#f5f5f5;font-size:30px;cursor:pointer;margin:16px auto}
+.record-btn.recording{background:#ffebee;border-color:#f44336}
+.nav-bar{position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:1px solid #e0e0e0;display:flex;z-index:50}
+.nav-item{flex:1;text-align:center;padding:10px;font-size:12px;cursor:pointer;color:#888}
+.nav-item.active{color:#2196f3}.nav-item .icon{font-size:22px}
+.diff-option{flex:1;padding:10px;border:2px solid #e0e0e0;border-radius:10px;text-align:center;cursor:pointer;font-size:14px}
+.diff-option.selected{border-color:#2196f3;background:#e3f2fd;color:#2196f3}
+.diff-row{display:flex;gap:8px;margin:8px 0}
+</style>
+</head>
+<body>
+
+<div id="app"></div>
+<div id="nav" class="nav-bar">
+  <div class="nav-item active" onclick="showPage('home')"><div class="icon">🏠</div>首页</div>
+  <div class="nav-item" onclick="showPage('lock')"><div class="icon">🔒</div>挑战</div>
+  <div class="nav-item" onclick="showPage('settings')"><div class="icon">⚙️</div>设置</div>
+</div>
+
+<script>
+// ==================== APP STATE ====================
+const STATE = {
+  page: 'home',
+  currentApp: '',
+  isGame: false,
+  gamingSeconds: 0,
+  isLocked: false,
+  isMonitoring: false,
+  settings: {
+    dailyLimit: 60,
+    mathDifficulty: 'medium',
+    englishDifficulty: 'medium',
+    mathCount: 3,
+    englishCount: 2
+  },
+  pinHash: '',
+  // Challenge state
+  challenge: {
+    phase: 'math',
+    mathProblems: [],
+    mathIndex: 0,
+    mathCorrect: 0,
+    englishPhrases: [],
+    englishIndex: 0,
+    englishPass: 0
+  },
+  settingsAuth: false,
+  pinInput: ''
+};
+
+// ==================== RENDER ====================
+function render() {
+  const app = document.getElementById('app');
+  const s = STATE;
+
+  if (s.settingsAuth === false && s.page === 'settings') {
+    app.innerHTML = renderPinGate();
+    return;
+  }
+
+  switch (s.page) {
+    case 'home': app.innerHTML = renderHome(); break;
+    case 'lock': app.innerHTML = renderLock(); break;
+    case 'settings': app.innerHTML = renderSettings(); break;
+  }
+}
+
+// ==================== HOME ====================
+function renderHome() {
+  const s = STATE;
+  const limit = s.settings.dailyLimit * 60;
+  const remain = Math.max(0, limit - s.gamingSeconds);
+  const pct = limit > 0 ? Math.min(100, (s.gamingSeconds / limit) * 100) : 0;
+  const isDanger = s.gamingSeconds >= limit;
+  const isWarn = !isDanger && pct > 80;
+  const cls = isDanger ? 'danger' : isWarn ? 'warn' : '';
+  const statusCls = isDanger ? 'danger' : isWarn ? 'warn' : 'safe';
+  const statusText = isDanger ? '已超时！' : isWarn ? '接近上限' : '正常';
+  const fmt = secs => {
+    const h = Math.floor(secs / 3600), m = Math.floor((secs % 3600) / 60), ss = secs % 60;
+    return h > 0 ? `${h}:${String(m).padStart(2,'0')}:${String(ss).padStart(2,'0')}` : `${String(m).padStart(2,'0')}:${String(ss).padStart(2,'0')}`;
+  };
+
+  return `
+    <div class="header"><h1>TeenGuard</h1><p>青少年游戏守护</p></div>
+    <div class="card" style="text-align:center">
+      <div class="timer-circle ${cls}">
+        <div class="timer-value" id="timer">${fmt(s.gamingSeconds)}</div>
+        <div class="timer-label">今日游戏时长</div>
+      </div>
+      <div class="progress-bar" style="margin:12px 0"><div class="progress-fill" style="width:${Math.min(pct,100)}%;background:${isDanger?'#f44336':isWarn?'#ff9800':'#4caf50'}"></div></div>
+      <div style="font-size:12px;color:#888">限额 ${s.settings.dailyLimit} 分钟 | 剩余 ${fmt(remain)}</div>
+      <div style="margin-top:12px"><span class="status ${statusCls}">${s.isMonitoring ? '🟢 ' : '⚪ '}${statusText}</span></div>
+    </div>
+    <div class="card">
+      ${!s.isMonitoring ? `<button class="btn btn-green" onclick="startMonitor()">▶ 开始监控</button>` : `<button class="btn btn-orange" onclick="stopMonitor()">⏸ 停止监控</button>`}
+      <div class="row">
+        <button class="btn btn-red" onclick="manualLock()">🔒 手动锁定</button>
+      </div>
+    </div>
+    ${isDanger ? `<div class="locked-banner"><div class="icon">🔒</div><h3>屏幕已锁定</h3><p>完成挑战解锁 | 关机不能解除</p></div>` : ''}
+    <div class="card" style="font-size:13px;color:#888">
+      <b>📌 使用说明</b><br><br>
+      • 后台监控游戏时长<br>
+      • 超时自动锁定屏幕<br>
+      • 完成数学题+英语口语解锁<br>
+      • 关机重启无法解除<br>
+      • 设置中可调难度和时限
+    </div>`;
+}
+
+// ==================== MONITOR ====================
+function startMonitor() {
+  if (window.TeenGuard) {
+    if (!TeenGuard.hasUsageStatsPermission()) {
+      TeenGuard.openUsageStatsSettings();
+      alert('请先授予"使用情况访问"权限');
+      return;
+    }
+    TeenGuard.startMonitoring();
+    STATE.isMonitoring = true;
+    render();
+  }
+}
+function stopMonitor() {
+  if (window.TeenGuard) { TeenGuard.stopMonitoring(); STATE.isMonitoring = false; render(); }
+}
+function manualLock() {
+  STATE.isLocked = true;
+  STATE.challenge = generateChallenge();
+  if (window.TeenGuard) TeenGuard.lockScreen();
+  showPage('lock');
+}
+
+// ==================== LOCK SCREEN ====================
+function renderLock() {
+  const c = STATE.challenge;
+  const total = STATE.settings.mathCount + STATE.settings.englishCount;
+  const done = (c.phase === 'math' ? c.mathIndex : STATE.settings.mathCount + c.englishIndex);
+  const pct = Math.round((done / total) * 100);
+
+  if (c.phase === 'complete') {
+    return `<div class="screen"><div style="text-align:center;padding-top:60px">
+      <div style="font-size:60px">🎉</div>
+      <h2 style="margin:16px">挑战完成！</h2><p>屏幕已解锁</p>
+      <button class="btn btn-green" style="margin-top:24px" onclick="doUnlock()">解锁屏幕</button>
+    </div></div>`;
+  }
+
+  if (c.phase === 'math') {
+    const prob = c.mathProblems[c.mathIndex];
+    if (!prob) return 'Loading...';
+    return `<div class="screen"><div style="max-width:400px;margin:0 auto;padding-top:20px">
+      <h3 style="text-align:center;color:#d32f2f">🔒 屏幕已锁定</h3>
+      <p style="text-align:center;color:#888;font-size:13px">关机重启无法解除</p>
+      <div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>
+      <p style="text-align:center;font-size:12px;color:#888">数学题 ${c.mathIndex+1}/${STATE.settings.mathCount} | 正确 ${c.mathCorrect}</p>
+      <div class="challenge-card">
+        <div class="question">${prob.q}</div>
+        <input id="mathAnswer" type="number" placeholder="输入答案" autofocus onkeydown="if(event.key==='Enter')submitMath()">
+        <button class="btn btn-blue" onclick="submitMath()">提交</button>
+        <p id="mathFeedback" style="margin-top:8px;font-size:14px"></p>
+      </div>
+      <div style="text-align:center;margin-top:16px">
+        <button class="btn btn-gray" onclick="showPinPad()" style="font-size:14px">🔑 家长密码解锁</button>
+      </div>
+    </div></div>`;
+  }
+
+  if (c.phase === 'english') {
+    const phr = c.englishPhrases[c.englishIndex];
+    if (!phr) return 'Loading...';
+    return `<div class="screen"><div style="max-width:400px;margin:0 auto;padding-top:20px">
+      <h3 style="text-align:center;color:#d32f2f">🔒 屏幕已锁定</h3>
+      <div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>
+      <p style="text-align:center;font-size:12px;color:#888">英语口语 ${c.englishIndex+1}/${STATE.settings.englishCount} | 通过 ${c.englishPass}</p>
+      <div class="phrase-card">
+        <p style="font-size:13px;color:#666">请大声朗读：</p>
+        <div class="target">${phr.t}</div>
+        <div class="hint">💡 ${phr.h}</div>
+        <button id="speakBtn" class="record-btn" onclick="simulateSpeech()">🎤</button>
+        <p id="speechResult" style="margin-top:8px;font-size:14px;color:#666"></p>
+        <button class="btn btn-green" onclick="submitSpeech()">确认提交</button>
+      </div>
+    </div></div>`;
+  }
+}
+
+function generateChallenge() {
+  const mathProblems = [];
+  const diff = STATE.settings.mathDifficulty;
+  for (let i = 0; i < STATE.settings.mathCount; i++) {
+    let a, b, op, q, ans;
+    if (diff === 'easy') { a = rand(1, 50); b = rand(1, 50); op = '+'; ans = a + b; q = `${a} + ${b}`; }
+    else if (diff === 'medium') { a = rand(1, 12); b = rand(1, 12); op = '×'; ans = a * b; q = `${a} × ${b}`; }
+    else { a = rand(1, 20); b = rand(1, 20); ans = a * b + rand(1, 10); q = `${a} × ${b} + ${ans - a*b}`; }
+    mathProblems.push({ q: q + ' = ?', a: ans });
+  }
+  const phrases = {
+    easy: [{t:'hello',h:'你好'},{t:'thank you',h:'谢谢'},{t:'good morning',h:'早上好'},{t:'I am happy',h:'我很快乐'},{t:'good night',h:'晚安'}],
+    medium: [{t:'The weather is beautiful today',h:'今天天气很好'},{t:'I enjoy playing with friends',h:'我喜欢和朋友玩'},{t:'Reading books is fun',h:'读书很有趣'},{t:'Practice makes perfect',h:'熟能生巧'}],
+    hard: [{t:'Technology has changed how people communicate',h:'科技改变了交流方式'},{t:'Environmental protection is important for everyone',h:'环保对每个人都很重要'}]
+  };
+  const pool = phrases[STATE.settings.englishDifficulty] || phrases.medium;
+  const englishPhrases = pool.sort(() => Math.random() - 0.5).slice(0, STATE.settings.englishCount);
+  return { phase: 'math', mathProblems, mathIndex: 0, mathCorrect: 0, englishPhrases, englishIndex: 0, englishPass: 0 };
+}
+
+function submitMath() {
+  const input = document.getElementById('mathAnswer');
+  const fb = document.getElementById('mathFeedback');
+  const prob = STATE.challenge.mathProblems[STATE.challenge.mathIndex];
+  const userAns = parseFloat(input.value);
+  if (isNaN(userAns)) { fb.innerHTML = '❌ 请输入数字'; return; }
+  if (Math.abs(userAns - prob.a) < 0.01) {
+    STATE.challenge.mathCorrect++;
+    fb.innerHTML = '✅ 正确！';
+  } else {
+    fb.innerHTML = `❌ 正确答案是 ${prob.a}`;
+  }
+  STATE.challenge.mathIndex++;
+  if (STATE.challenge.mathIndex >= STATE.settings.mathCount) {
+    STATE.challenge.phase = 'english';
+  }
+  setTimeout(() => render(), 800);
+}
+
+let simulatedSpeech = '';
+function simulateSpeech() {
+  const phr = STATE.challenge.englishPhrases[STATE.challenge.englishIndex];
+  const btn = document.getElementById('speakBtn');
+  btn.textContent = '⏺'; btn.classList.add('recording');
+  document.getElementById('speechResult').innerHTML = '🎙 聆听中...';
+  setTimeout(() => {
+    simulatedSpeech = phr.t;
+    document.getElementById('speechResult').innerHTML = `识别: "${simulatedSpeech}"`;
+    btn.textContent = '🎤'; btn.classList.remove('recording');
+  }, 1500);
+}
+
+function submitSpeech() {
+  const phr = STATE.challenge.englishPhrases[STATE.challenge.englishIndex];
+  if (!simulatedSpeech) { alert('请先录音'); return; }
+  const similarity = compareText(simulatedSpeech, phr.t);
+  if (similarity > 0.6) {
+    STATE.challenge.englishPass++;
+  }
+  STATE.challenge.englishIndex++;
+  if (STATE.challenge.englishIndex >= STATE.settings.englishCount) {
+    STATE.challenge.phase = 'complete';
+  }
+  simulatedSpeech = '';
+  render();
+}
+
+function compareText(a, b) {
+  const la = a.toLowerCase().trim(), lb = b.toLowerCase().trim();
+  if (la === lb) return 1;
+  let match = 0;
+  for (let i = 0; i < Math.min(la.length, lb.length); i++) { if (la[i] === lb[i]) match++; }
+  return match / Math.max(la.length, lb.length);
+}
+
+function doUnlock() {
+  STATE.isLocked = false;
+  STATE.gamingSeconds = 0;
+  if (window.TeenGuard) { TeenGuard.unlockScreen(); TeenGuard.resetTimer(); }
+  showPage('home');
+}
+
+// ==================== PIN PAD ====================
+function showPinPad() {
+  const app = document.getElementById('app');
+  app.innerHTML = `<div class="screen"><div style="text-align:center;padding-top:40px">
+    <h3>家长密码解锁</h3>
+    <div class="pin-dots">${[0,1,2,3].map(i => `<div class="pin-dot ${i < STATE.pinInput.length ? 'filled' : ''}"></div>`).join('')}</div>
+    <div class="num-pad">
+      ${[1,2,3,4,5,6,7,8,9,'',0,'⌫'].map(n => `<button class="num-btn" onclick="${n === '' ? '' : n === '⌫' ? 'pinDelete()' : 'pinPress('+n+')'}" ${n===''?'disabled':''}>${n===''?'':n}</button>`).join('')}
+    </div>
+    <button class="btn btn-gray" style="margin-top:12px;max-width:240px;margin-left:auto;margin-right:auto" onclick="hidePinPad()">取消</button>
+  </div></div>`;
+}
+
+function pinPress(n) {
+  STATE.pinInput += String(n);
+  if (STATE.pinInput.length >= 4) {
+    verifyPin();
+  }
+  showPinPad();
+}
+
+function pinDelete() {
+  STATE.pinInput = STATE.pinInput.slice(0, -1);
+  showPinPad();
+}
+
+function hidePinPad() { STATE.pinInput = ''; render(); }
+
+function verifyPin() {
+  // Simple hash verification
+  const hash = simpleHash(STATE.pinInput);
+  if (hash === STATE.pinHash || STATE.pinHash === '') {
+    STATE.isLocked = false;
+    STATE.pinInput = '';
+    if (window.TeenGuard) { TeenGuard.unlockScreen(); TeenGuard.resetTimer(); }
+    alert('解锁成功');
+    showPage('home');
+  } else {
+    STATE.pinInput = '';
+    alert('密码错误！');
+    showPinPad();
+  }
+}
+
+function simpleHash(s) {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) { h = ((h << 5) - h) + s.charCodeAt(i); h |= 0; }
+  return 'tg_' + Math.abs(h).toString(16);
+}
+
+// ==================== SETTINGS ====================
+function renderPinGate() {
+  return `<div class="screen"><div style="text-align:center;padding-top:60px">
+    <div style="font-size:50px">🔐</div>
+    <h3 style="margin:16px">需要家长密码</h3>
+    <input id="pinGateInput" type="password" maxlength="4" placeholder="输入4位密码" style="text-align:center;font-size:24px;letter-spacing:8px;width:200px" oninput="checkPinGate(this.value)">
+    <p id="pinGateError" style="color:#f44336;margin-top:8px"></p>
+    <button class="btn btn-gray" style="width:200px;margin:12px auto" onclick="showPage('home');STATE.settingsAuth=null">返回</button>
+  </div></div>`;
+}
+
+function checkPinGate(val) {
+  if (val.length === 4) {
+    const hash = simpleHash(val);
+    if (hash === STATE.pinHash || STATE.pinHash === '') {
+      STATE.settingsAuth = true;
+      render();
+    } else {
+      document.getElementById('pinGateError').textContent = '密码错误';
+      document.getElementById('pinGateInput').value = '';
+    }
+  }
+}
+
+function renderSettings() {
+  const s = STATE.settings;
+  const diffs = ['easy','medium','hard'];
+  const diffLabels = {easy:'简单',medium:'中等',hard:'困难'};
+  return `<div class="screen"><div style="max-width:400px;margin:0 auto">
+    <div class="screen-header"><span class="back" onclick="showPage('home')">←</span><h2>家长设置</h2></div>
+    <div class="card">
+      <label>⏱ 每日游戏时限（分钟）</label>
+      <input id="setLimit" type="number" value="${s.dailyLimit}" min="5" max="480">
+    </div>
+    <div class="card">
+      <label>📐 数学难度</label>
+      <div class="diff-row">${diffs.map(d => `<div class="diff-option ${s.mathDifficulty===d?'selected':''}" onclick="document.querySelectorAll('#mathDiff .diff-option').forEach(e=>e.classList.remove('selected'));event.target.classList.add('selected');STATE.settings.mathDifficulty='${d}'">${diffLabels[d]}</div>`).join('')}</div>
+    </div>
+    <div class="card">
+      <label>🗣 英语难度</label>
+      <div class="diff-row">${diffs.map(d => `<div class="diff-option ${s.englishDifficulty===d?'selected':''}" onclick="document.querySelectorAll('#engDiff .diff-option').forEach(e=>e.classList.remove('selected'));event.target.classList.add('selected');STATE.settings.englishDifficulty='${d}'">${diffLabels[d]}</div>`).join('')}</div>
+    </div>
+    <div class="card">
+      <label>📝 数学题数 / 🎤 英语题数</label>
+      <div class="row" style="gap:8px">
+        <input id="setMathCount" type="number" value="${s.mathCount}" min="1" max="10" style="flex:1">
+        <input id="setEngCount" type="number" value="${s.englishCount}" min="1" max="10" style="flex:1">
+      </div>
+    </div>
+    <div class="card">
+      <label>🔑 修改家长密码</label>
+      <input id="setPin" type="password" maxlength="4" placeholder="新密码（4位数字，留空不修改）">
+    </div>
+    <button class="btn btn-blue" onclick="saveSettings()">💾 保存设置</button>
+  </div></div>`;
+}
+
+function saveSettings() {
+  const limit = parseInt(document.getElementById('setLimit').value);
+  const mathCount = parseInt(document.getElementById('setMathCount').value);
+  const engCount = parseInt(document.getElementById('setEngCount').value);
+  const newPin = document.getElementById('setPin').value;
+
+  if (limit < 5 || limit > 480) { alert('时限5-480分钟'); return; }
+  if (mathCount < 1 || mathCount > 10) { alert('题数1-10'); return; }
+
+  STATE.settings.dailyLimit = limit;
+  STATE.settings.mathCount = mathCount;
+  STATE.settings.englishCount = engCount;
+
+  if (newPin.length === 4) {
+    STATE.pinHash = simpleHash(newPin);
+  }
+
+  if (window.TeenGuard) {
+    TeenGuard.saveSettings(JSON.stringify(STATE.settings));
+    if (STATE.pinHash) TeenGuard.savePinHash(STATE.pinHash);
+  }
+
+  alert('设置已保存！');
+  showPage('home');
+}
+
+// ==================== NAVIGATION ====================
+function showPage(page) {
+  STATE.page = page;
+  if (page === 'lock' && !STATE.isLocked) {
+    STATE.isLocked = true;
+    STATE.challenge = generateChallenge();
+    if (window.TeenGuard) TeenGuard.lockScreen();
+  }
+  document.querySelectorAll('.nav-item').forEach((el, i) => {
+    el.classList.toggle('active', ['home','lock','settings'][i] === page);
+  });
+  render();
+}
+
+// ==================== HELPERS ====================
+function rand(min, max) { return Math.floor(Math.random() * (max - min + 1)) + min; }
+
+// ==================== INIT ====================
+function init() {
+  // Load settings
+  if (window.TeenGuard) {
+    try {
+      const saved = JSON.parse(TeenGuard.getSettings() || '{}');
+      if (saved.dailyLimit) STATE.settings = { ...STATE.settings, ...saved };
+      STATE.pinHash = TeenGuard.getPinHash() || '';
+    } catch(e) {}
+  }
+  render();
+
+  // Timer update loop
+  setInterval(() => {
+    if (window.TeenGuard && STATE.isMonitoring) {
+      STATE.gamingSeconds = TeenGuard.getTodayGamingSeconds();
+      const limit = STATE.settings.dailyLimit * 60;
+      if (STATE.gamingSeconds >= limit && !STATE.isLocked) {
+        STATE.isLocked = true;
+        STATE.challenge = generateChallenge();
+        if (window.TeenGuard) TeenGuard.lockScreen();
+        showPage('lock');
+        return;
+      }
+      if (STATE.page === 'home') render();
+    }
+  }, 1000);
+}
+
+document.addEventListener('DOMContentLoaded', init);
+</script>
+</body>
+</html>

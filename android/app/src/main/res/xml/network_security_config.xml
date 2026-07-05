@@ -1,9 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<network-security-config>
-    <!-- TeenGuard 完全离线运行，禁止所有网络请求以保护隐私 -->
-    <base-config cleartextTrafficPermitted="false">
-        <trust-anchors>
-            <certificates src="system" />
-        </trust-anchors>
-    </base-config>
-</network-security-config>
