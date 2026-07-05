@@ -60,10 +60,6 @@ public class MainActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
-        // Restore lock overlay if needed
-        if (LockService.isLocked()) {
-            startService(new Intent(this, LockService.class));
-        }
     }
 
     public class AppBridge {
@@ -75,13 +71,11 @@ public class MainActivity extends Activity {
             } else {
                 startService(intent);
             }
-            Toast.makeText(MainActivity.this, "监控已启动", Toast.LENGTH_SHORT).show();
         }
 
         @JavascriptInterface
         public void stopMonitoring() {
             stopService(new Intent(MainActivity.this, MonitorService.class));
-            Toast.makeText(MainActivity.this, "监控已停止", Toast.LENGTH_SHORT).show();
         }
 
         @JavascriptInterface
@@ -92,13 +86,11 @@ public class MainActivity extends Activity {
             } else {
                 startService(intent);
             }
-            LockService.setLocked(true);
         }
 
         @JavascriptInterface
         public void unlockScreen() {
             stopService(new Intent(MainActivity.this, LockService.class));
-            LockService.setLocked(false);
         }
 
         @JavascriptInterface
