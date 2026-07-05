@@ -6,11 +6,9 @@ import android.app.usage.UsageStatsManager;
 import android.content.*;
 import android.os.*;
 import android.provider.Settings;
-import androidx.core.app.NotificationCompat;
 import java.util.*;
 
 public class MonitorService extends Service {
-    private static final String CHANNEL_ID = "teenguard_monitor";
     private static final String PREFS = "teenguard_monitor";
     private static final Set<String> GAME_PACKAGES = new HashSet<>(Arrays.asList(
         "com.tencent.tmgp.sgame", "com.tencent.tmgp.pubgmhd",
@@ -26,22 +24,31 @@ public class MonitorService extends Service {
     @Override
     public void onCreate() {
         super.onCreate();
-        createChannel();
-        startForeground(1, new NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("TeenGuard 监控中")
-            .setContentText("正在守护...")
-            .setSmallIcon(android.R.drawable.ic_lock_idle_lock)
-            .build());
+        String channelId = "teenguard_monitor";
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            NotificationChannel ch = new NotificationChannel(channelId, "守护监控", NotificationManager.IMPORTANCE_LOW);
+            ((NotificationManager) getSystemService(NOTIFICATION_SERVICE)).createNotificationChannel(ch);
+        }
+        Notification n = Build.VERSION.SDK_INT >= Build.VERSION_CODES.O ?
+            new Notification.Builder(this, channelId)
+                .setContentTitle("TeenGuard 监控中")
+                .setContentText("正在守护...")
+                .setSmallIcon(android.R.drawable.ic_lock_idle_lock)
+                .build() :
+            new Notification.Builder(this)
+                .setContentTitle("TeenGuard 监控中")
+                .setContentText("正在守护...")
+                .setSmallIcon(android.R.drawable.ic_lock_idle_lock)
+                .build();
+        startForeground(1, n);
     }
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         new Thread(() -> {
             while (true) {
-                try {
-                    checkForegroundApp();
-                    Thread.sleep(5000);
-                } catch (InterruptedException e) { break; }
+                try { checkForegroundApp(); Thread.sleep(5000); }
+                catch (InterruptedException e) { break; }
             }
         }).start();
         return START_STICKY;
@@ -53,52 +60,37 @@ public class MonitorService extends Service {
         long now = System.currentTimeMillis();
         List<UsageStats> stats = usm.queryUsageStats(UsageStatsManager.INTERVAL_DAILY, now - 10000, now);
         if (stats == null || stats.isEmpty()) return;
-
         UsageStats top = null;
         for (UsageStats s : stats) {
             if (top == null || s.getLastTimeUsed() > top.getLastTimeUsed()) top = s;
         }
         if (top == null) return;
-
         String pkg = top.getPackageName();
         SharedPreferences prefs = getSharedPreferences(PREFS, MODE_PRIVATE);
         prefs.edit().putString("current_app", pkg).apply();
-
         if (GAME_PACKAGES.contains(pkg)) {
             String today = new java.text.SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(new Date());
             String savedDate = prefs.getString("date", "");
-            int seconds = prefs.getInt("seconds", 0);
-            if (!today.equals(savedDate)) { seconds = 0; savedDate = today; }
-            seconds++;
-            prefs.edit().putInt("seconds", seconds).putString("date", savedDate).apply();
+            int secs = prefs.getInt("seconds", 0);
+            if (!today.equals(savedDate)) { secs = 0; prefs.edit().putString("date", today).apply(); }
+            prefs.edit().putInt("seconds", secs + 1).apply();
         }
     }
 
-    @Override
-    public IBinder onBind(Intent intent) { return null; }
-
-    private void createChannel() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            NotificationChannel ch = new NotificationChannel(CHANNEL_ID, "守护监控", NotificationManager.IMPORTANCE_LOW);
-            ((NotificationManager) getSystemService(NOTIFICATION_SERVICE)).createNotificationChannel(ch);
-        }
-    }
+    @Override public IBinder onBind(Intent intent) { return null; }
 
     public static int getTodaySeconds(Context ctx) {
-        SharedPreferences prefs = ctx.getSharedPreferences(PREFS, MODE_PRIVATE);
+        SharedPreferences p = ctx.getSharedPreferences(PREFS, MODE_PRIVATE);
         String today = new java.text.SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(new Date());
-        if (!today.equals(prefs.getString("date", ""))) return 0;
-        return prefs.getInt("seconds", 0);
+        if (!today.equals(p.getString("date", ""))) return 0;
+        return p.getInt("seconds", 0);
     }
-
     public static String getCurrentApp(Context ctx) {
         return ctx.getSharedPreferences(PREFS, MODE_PRIVATE).getString("current_app", "");
     }
-
     public static boolean isGameApp(Context ctx) {
         return GAME_PACKAGES.contains(getCurrentApp(ctx));
     }
-
     public static boolean hasPermission(Context ctx) {
         try {
             android.app.AppOpsManager appOps = (android.app.AppOpsManager) ctx.getSystemService(Context.APP_OPS_SERVICE);
@@ -106,7 +98,6 @@ public class MonitorService extends Service {
             return mode == android.app.AppOpsManager.MODE_ALLOWED;
         } catch (Exception e) { return false; }
     }
-
     public static void resetToday(Context ctx) {
         ctx.getSharedPreferences(PREFS, MODE_PRIVATE).edit().putInt("seconds", 0).apply();
     }
