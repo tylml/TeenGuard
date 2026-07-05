@@ -94,7 +94,7 @@ public class MonitorService extends Service {
     public static boolean hasPermission(Context ctx) {
         try {
             android.app.AppOpsManager appOps = (android.app.AppOpsManager) ctx.getSystemService(Context.APP_OPS_SERVICE);
-            int mode = appOps.checkOpNoThrow("android:get_usage_stats", Process.myUid(), ctx.getPackageName());
+            int mode = appOps.checkOpNoThrow("android:get_usage_stats", android.os.Process.myUid(), ctx.getPackageName());
             return mode == android.app.AppOpsManager.MODE_ALLOWED;
         } catch (Exception e) { return false; }
     }
